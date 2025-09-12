@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fast Drink Recipes — Học công thức pha chế nhanh</title>
+  <style>
+    :root{--accent:#0ea5a4;--bg:#0f172a;--card:#0b1220;--muted:#94a3b8}
+    *{box-sizing:border-box;font-family:Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial}
+    body{margin:0;background:linear-gradient(180deg,#081028 0%, #071221 100%);color:#e6eef6;min-height:100vh}
+    header{padding:18px;display:flex;gap:12px;align-items:center;border-bottom:1px solid rgba(255,255,255,.04)}
+    .logo{display:flex;flex-direction:column}
+    h1{margin:0;font-size:18px}
+    .controls{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .search{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.06);background:transparent;color:inherit}
+    .container{display:grid;grid-template-columns:360px 1fr;gap:18px;padding:18px}
+    .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px}
+    .recipes-list{max-height:66vh;overflow:auto}
+    .recipe-item{padding:10px;border-radius:8px;margin-bottom:8px;cursor:pointer;border:1px solid rgba(255,255,255,.03)}
+    .recipe-item:hover{transform:translateY(-2px)}
+    .tags{font-size:12px;color:var(--muted)}
+    .main{padding:14px}
+    .title-row{display:flex;gap:12px;align-items:center}
+    .big-title{font-size:22px;margin:0}
+    .meta{color:var(--muted);font-size:13px}
+    .ingredients, .steps{margin-top:12px}
+    .btn{padding:8px 12px;border-radius:8px;border:none;background:var(--accent);color:#022;cursor:pointer}
+    .small{padding:6px 8px;font-size:13px}
+    .flashcard{display:flex;align-items:center;justify-content:space-between;padding:18px;border-radius:12px;background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));margin-top:12px}
+    .flashcard .term{font-weight:600}
+    .quiz{margin-top:12px}
+    footer{padding:12px;text-align:center;color:var(--muted);font-size:13px}
+    label.switch{display:inline-flex;align-items:center;gap:8px}
+    .favorites{color:#f59e0b}
+    textarea{width:100%;min-height:80px;background:transparent;color:inherit;border:1px dashed rgba(255,255,255,.04);padding:8px;border-radius:8px}
+    @media(max-width:880px){.container{grid-template-columns:1fr;}.controls{display:none}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">
+      <h1>Fast Drink Recipes</h1>
+      <div class="meta">Học công thức & luyện nhanh — lưu trữ cục bộ</div>
+    </div>
+
+    <div class="controls">
+      <input id="search" class="search" placeholder="Tìm tên, nguyên liệu, tag..." />
+      <button id="addBtn" class="btn small">Thêm công thức</button>
+      <button id="exportBtn" class="btn small">Xuất JSON</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside class="panel">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+        <input id="filterTag" placeholder="Lọc theo tag (ví dụ: coffee)" style="flex:1;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,.04)" />
+        <label class="switch"><input type="checkbox" id="unitToggle"/> Metric</label>
+      </div>
+
+      <div class="recipes-list" id="recipesList">
+        <!-- danh sách công thức sẽ hiển thị ở đây -->
+      </div>
+
+      <div style="margin-top:12px">
+        <strong>Flashcards nhanh</strong>
+        <div id="flashContainer"></div>
+        <button id="startFlash" class="btn small" style="margin-top:8px">Bắt đầu flashcards</button>
+      </div>
+
+    </aside>
+
+    <main class="panel main">
+      <div id="mainContent">
+        <div class="title-row">
+          <h2 class="big-title" id="titleMain">Chọn một công thức</h2>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            <button id="favBtn" class="btn small">❤ Thêm yêu thích</button>
+            <button id="startSteps" class="btn small">Chế độ bước</button>
+          </div>
+        </div>
+        <div class="meta" id="metaMain">Số nguyên liệu: — • Thời gian: —</div>
+
+        <div class="ingredients" id="ingredients"></div>
+        <div class="steps" id="steps"></div>
+
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+          <button id="randomBtn" class="btn">Gợi ý ngẫu nhiên</button>
+          <button id="quizBtn" class="btn">Quiz: đoán nguyên liệu</button>
+          <button id="importBtn" class="btn">Nhập JSON</button>
+        </div>
+
+        <div id="quizArea" class="quiz"></div>
+        <div id="stepModeArea"></div>
+        <div id="importArea" style="margin-top:10px;display:none">
+          <textarea id="importTextarea" placeholder='Dán JSON công thức vào đây (mảng các object)'></textarea>
+          <button id="doImport" class="btn small">Nhập</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <footer>Được tạo để học nhanh công thức pha chế • Lưu trữ: localStorage • Bạn có thể chỉnh và thêm công thức của mình</footer>
+
+  <script>
+    const sampleRecipes = [
+      {id:1,name:'Espresso',tags:['coffee','hot'],time:'2 mins',ingredients:[{name:'Coffee (g)', qty:18}],steps:['Tamp và nén','Chiết xuất trong ~25-30s']},
+      {id:2,name:'Iced Latte',tags:['coffee','cold','milk'],time:'5 mins',ingredients:[{name:'Espresso (shot)', qty:30,unit:'ml'},{name:'Milk',qty:180,unit:'ml'},{name:'Ice',qty:4,unit:'cubes'}],steps:['Rót espresso vào ly','Thêm đá','Đổ sữa lên']},
+      {id:3,name:'Mojito',tags:['cocktail','mint','cold'],time:'8 mins',ingredients:[{name:'Lime juice',qty:30,unit:'ml'},{name:'Sugar syrup',qty:15,unit:'ml'},{name:'Mint leaves',qty:8,unit:'leaves'},{name:'White rum',qty:45,unit:'ml'},{name:'Soda water',qty:60,unit:'ml'},{name:'Ice',qty:6,unit:'cubes'}],steps:['Dằm lá bạc hà với đường và lime','Thêm rum và đá','Đổ soda lên và trang trí']}
+    ];
+
+    const KEY = 'fast_drink_recipes_v1';
+    let recipes = loadRecipes();
+    let current = null;
+
+    const recipesList = document.getElementById('recipesList');
+    const titleMain = document.getElementById('titleMain');
+    const metaMain = document.getElementById('metaMain');
+    const ingredientsEl = document.getElementById('ingredients');
+    const stepsEl = document.getElementById('steps');
+    const searchEl = document.getElementById('search');
+    const filterTag = document.getElementById('filterTag');
+    const unitToggle = document.getElementById('unitToggle');
+    const favBtn = document.getElementById('favBtn');
+    const startFlash = document.getElementById('startFlash');
+    const flashContainer = document.getElementById('flashContainer');
+    const randomBtn = document.getElementById('randomBtn');
+    const quizBtn = document.getElementById('quizBtn');
+    const quizArea = document.getElementById('quizArea');
+    const startSteps = document.getElementById('startSteps');
+    const stepModeArea = document.getElementById('stepModeArea');
+    const addBtn = document.getElementById('addBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const importBtn = document.getElementById('importBtn');
+    const importArea = document.getElementById('importArea');
+    const importTextarea = document.getElementById('importTextarea');
+    const doImport = document.getElementById('doImport');
+
+    renderList();
+
+    searchEl.addEventListener('input', renderList);
+    filterTag.addEventListener('input', renderList);
+    unitToggle.addEventListener('change', renderMain);
+    randomBtn.addEventListener('click', pickRandom);
+    quizBtn.addEventListener('click', startQuiz);
+    startFlash.addEventListener('click', startFlashcards);
+    addBtn.addEventListener('click', createRecipeDialog);
+    exportBtn.addEventListener('click', exportJSON);
+    importBtn.addEventListener('click', ()=>{ importArea.style.display = importArea.style.display==='none'? 'block':'none' });
+    doImport.addEventListener('click', doImportRecipes);
+
+    function loadRecipes(){
+      const raw = localStorage.getItem(KEY);
+      if(!raw){ localStorage.setItem(KEY, JSON.stringify(sampleRecipes)); return JSON.parse(JSON.stringify(sampleRecipes)); }
+      try{ return JSON.parse(raw);}catch(e){ localStorage.setItem(KEY, JSON.stringify(sampleRecipes)); return JSON.parse(JSON.stringify(sampleRecipes)); }
+    }
+    function saveRecipes(){ localStorage.setItem(KEY, JSON.stringify(recipes)); }
+
+    function renderList(){
+      const q = searchEl.value.trim().toLowerCase();
+      const tag = filterTag.value.trim().toLowerCase();
+      recipesList.innerHTML='';
+      const arr = recipes.filter(r=>{
+        if(q && !(r.name.toLowerCase().includes(q) || (r.ingredients||[]).some(i=> (i.name||'').toLowerCase().includes(q)) ) ) return false;
+        if(tag && !(r.tags||[]).some(t=>t.toLowerCase().includes(tag))) return false;
+        return true;
+      });
+      arr.forEach(r=>{
+        const div = document.createElement('div'); div.className='recipe-item';
+        div.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center">
+          <div><strong>${r.name}</strong><div class="tags">${(r.tags||[]).join(', ')} • ${r.time||''}</div></div>
+          <div style="display:flex;gap:6px">
+            <button class='small btn' data-id='${r.id}'>Chọn</button>
+            <button class='small btn deleteBtn' data-id='${r.id}' style="background:#b91c1c">Xóa</button>
+          </div>
+        </div>`;
+        recipesList.appendChild(div);
+      });
+      recipesList.querySelectorAll('button[data-id]').forEach(b=>{
+        if(b.classList.contains('deleteBtn')){
+          b.addEventListener('click', ()=>{ deleteRecipe(Number(b.dataset.id)); });
+        }else{
+          b.addEventListener('click', ()=>{ chooseRecipe(Number(b.dataset.id)); });
+        }
+      });
+    }
+
+    function deleteRecipe(id){
+      if(!confirm('Bạn có chắc muốn xóa công thức này?')) return;
+      recipes = recipes.filter(r=>r.id!==id);
+      saveRecipes();
+      if(current && current.id===id) current=null;
+      renderList();
+      renderMain();
+    }
+
+    function chooseRecipe(id){ current = recipes.find(r=>r.id===id); renderMain(); }
+
+    function renderMain(){
+      if(!current){ titleMain.textContent='Chọn một công thức'; metaMain.textContent='—'; ingredientsEl.innerHTML=''; stepsEl.innerHTML=''; return; }
+      titleMain.textContent = current.name;
+      metaMain.textContent = `${(current.ingredients||[]).length} nguyên liệu • ${current.time||'—'}`;
+      const isMetric = unitToggle.checked;
+      ingredientsEl.innerHTML = '<h3>Nguyên liệu</h3>' + (current.ingredients||[]).map(i=> {
+        const q = i.qty!==undefined ? `${i.qty}${i.unit? ' '+i.unit:''}` : '';
+        return `<div>${i.name} <span style="color:var(--muted)">${q}</span></div>`;
+      }).join('');
+      stepsEl.innerHTML = '<h3>Các bước</h3>' + (current.steps||[]).map((s,idx)=>`<div><strong>B${idx+1}.</strong> ${s}</div>`).join('');
+      favBtn.textContent = isFavorited(current.id)? '❤ Yêu thích' : 'Thêm yêu thích';
+      quizArea.innerHTML=''; stepModeArea.innerHTML='';
+    }
+
+    function isFavorited(id){ const favs = JSON.parse(localStorage.getItem('fav_drinks_v1')||'[]'); return favs.includes(id); }
+    favBtn.addEventListener('click', ()=>{
+      if(!current) return alert('Chọn công thức trước');
+      const favs = JSON.parse(localStorage.getItem('fav_drinks_v1')||'[]');
+      if(favs.includes(current.id)){ const idx=favs.indexOf(current.id); favs.splice(idx,1);} else favs.push(current.id);
+      localStorage.setItem('fav_drinks_v1', JSON.stringify(favs)); renderMain();
+    });
+
+    function pickRandom(){ const i = Math.floor(Math.random()*recipes.length); chooseRecipe(recipes[i].id); }
+
+    function startFlashcards(){
+      flashContainer.innerHTML='';
+      const arr = recipes.slice();
+      let idx=0;
+      if(!arr.length) return;
+      const card = document.createElement('div'); card.className='flashcard';
+      const left = document.createElement('div'); left.innerHTML = `<div class='term'>${arr[0].name}</div><div class='tags'>${arr[0].tags.join(', ')}</div>`;
+      const right = document.createElement('div'); right.innerHTML = `<div style='text-align:right'><button id='showBtn' class='small btn'>Hiện</button></div>`;
+      card.appendChild(left); card.appendChild(right); flashContainer.appendChild(card);
+      document.getElementById('showBtn').addEventListener('click', ()=>{
+        right.innerHTML = `<div style='text-align:right'><div><strong>Nguyên liệu</strong><div style='font-size:13px'>${arr[idx].ingredients.map(i=> i.name + (i.qty? ': '+i.qty+(i.unit? ' '+i.unit:'') : '')).join('<br>')}</div></div></div>`;
+      });
+      setInterval(()=>{
+        idx = (idx+1)%arr.length; left.querySelector('.term').textContent = arr[idx].name; left.querySelector('.tags').textContent = arr[idx].tags.join(', ');
+        right.innerHTML = `<div style='text-align:right'><button id='showBtn' class='small btn'>Hiện</button></div>`;
+        document.getElementById('showBtn').addEventListener('click', ()=>{
+          right.innerHTML = `<div style='text-align:right'><div><strong>Nguyên liệu</strong><div style='font-size:13px'>${arr[idx].ingredients.map(i=> i.name + (i.qty? ': '+i.qty+(i.unit? ' '+i.unit:'') : '')).join('<br>')}</div></div></div>`;
+        });
+      }, 6000);
+    }
+
+    function startQuiz(){
+      if(!current) return alert('Chọn công thức để quiz');
+      quizArea.innerHTML='';
+      const ing = current.ingredients.map(i=>i.name);
+      const correct = ing[Math.floor(Math.random()*ing.length)];
+      const pool = Array.from(new Set(recipes.flat
